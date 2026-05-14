@@ -1,0 +1,2176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>算力资源 0423-0506 变化可视化</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background: #f5f7fa; color: #333; }
+  .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+  h1 { font-size: 24px; margin-bottom: 20px; color: #1a1a2e; }
+  .subtitle { font-size: 14px; color: #666; margin-bottom: 24px; }
+  .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .kpi-card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .kpi-label { font-size: 13px; color: #888; margin-bottom: 6px; }
+  .kpi-value { font-size: 28px; font-weight: 700; color: #1a1a2e; }
+  .kpi-change { font-size: 13px; margin-top: 4px; }
+  .kpi-change.up { color: #e74c3c; }
+  .kpi-change.down { color: #27ae60; }
+  .kpi-change.neutral { color: #888; }
+  .card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 20px; }
+  .card-title { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #1a1a2e; }
+  .chart { width: 100%; height: 360px; }
+  .chart-tall { height: 500px; }
+  .filter-bar { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+  .filter-bar input, .filter-bar select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; outline: none; }
+  .filter-bar input:focus, .filter-bar select:focus { border-color: #4a90d9; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #eee; }
+  th { background: #f8f9fa; font-weight: 600; color: #555; position: sticky; top: 0; }
+  tr:hover { background: #f8f9fa; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; }
+  .tag-a100 { background: #e3f2fd; color: #1565c0; }
+  .tag-a800 { background: #fff3e0; color: #e65100; }
+  .tag-h200 { background: #f3e5f5; color: #6a1b9a; }
+  .tag-910b { background: #e8f5e9; color: #2e7d32; }
+  .tag-910c { background: #fce4ec; color: #c2185b; }
+  .tag-default { background: #eceff1; color: #455a64; }
+  .change-pos { color: #e74c3c; font-weight: 600; }
+  .change-neg { color: #27ae60; font-weight: 600; }
+  .change-zero { color: #888; }
+  .trend-mini { display: inline-flex; align-items: center; gap: 2px; }
+  .trend-bar { width: 3px; background: #ddd; border-radius: 1px; }
+  .date-cols { display: flex; gap: 4px; }
+  .date-cell { min-width: 36px; text-align: center; font-size: 11px; color: #666; }
+  .trend-popup { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 800px; max-width: 90vw; background: #fff; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.2); z-index: 100; padding: 24px; }
+  .trend-popup.active { display: block; }
+  .trend-popup .close { position: absolute; top: 16px; right: 20px; font-size: 20px; cursor: pointer; color: #888; }
+  .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 99; }
+  .overlay.active { display: block; }
+  .center-filter { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .center-chip { padding: 6px 14px; border-radius: 20px; font-size: 12px; cursor: pointer; border: 1px solid #ddd; background: #fff; transition: all 0.2s; }
+  .center-chip.active { background: #4a90d9; color: #fff; border-color: #4a90d9; }
+  .scroll-table { max-height: 500px; overflow-y: auto; border-radius: 8px; border: 1px solid #eee; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>算力资源变化可视化 Dashboard</h1>
+  <div class="subtitle">关注区间：2026年4月23日 - 5月6日（共14天） | 数据来源：算力资源分配总表</div>
+
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="kpi-label">4.23 总卡数</div>
+      <div class="kpi-value" id="kpi-start">-</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">5.6 总卡数</div>
+      <div class="kpi-value" id="kpi-end">-</div>
+      <div class="kpi-change" id="kpi-diff">-</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">有变化分区</div>
+      <div class="kpi-value" id="kpi-changed">-</div>
+      <div class="kpi-change neutral">共288个分区</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">增加分区 / 减少分区</div>
+      <div class="kpi-value" id="kpi-updown">-</div>
+      <div class="kpi-change neutral">净变化分区占比19%</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">总卡数趋势（全部分区汇总）</div>
+    <div id="chart-total" class="chart"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">各中心卡数趋势（堆叠）</div>
+    <div id="chart-center" class="chart chart-tall"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">分区净变化排行（0423→0506）</div>
+    <div id="chart-rank" class="chart chart-tall"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">有变化分区明细</div>
+    <div class="center-filter" id="center-chips"></div>
+    <div class="filter-bar">
+      <input type="text" id="search-input" placeholder="搜索分区名称...">
+      <select id="gpu-filter"><option value="">全部GPU</option></select>
+      <label style="font-size:13px;color:#666;"><input type="checkbox" id="only-change"> 只显示有变化</label>
+    </div>
+    <div class="scroll-table">
+      <table>
+        <thead>
+          <tr>
+            <th>分区名称</th>
+            <th>中心</th>
+            <th>GPU类型</th>
+            <th>所属集群</th>
+            <th>4.23卡数</th>
+            <th>5.6卡数</th>
+            <th>净变化</th>
+            <th>每日趋势</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" onclick="closePopup()"></div>
+<div class="trend-popup" id="popup">
+  <div class="close" onclick="closePopup()">&times;</div>
+  <div class="card-title" id="popup-title">分区趋势</div>
+  <div id="chart-popup" style="width:100%;height:360px;"></div>
+</div>
+
+<script>
+let rawData = null;
+let chartTotal, chartCenter, chartRank, chartPopup;
+
+async function loadData() {
+  // 嵌入数据（由Python生成）
+  const embedded = EMBED_DATA;
+  rawData = embedded;
+  renderAll();
+}
+
+function renderAll() {
+  renderKPIs();
+  renderTotalTrend();
+  renderCenterTrend();
+  renderRankChart();
+  renderTable();
+  renderFilters();
+}
+
+function renderKPIs() {
+  const total = rawData.daily_total;
+  const start = total[0];
+  const end = total[total.length - 1];
+  const diff = end - start;
+  const parts = rawData.partition_trends;
+  const changed = Object.values(parts);
+  const up = changed.filter(p => p.净变化 > 0).length;
+  const down = changed.filter(p => p.净变化 < 0).length;
+
+  document.getElementById('kpi-start').textContent = start.toLocaleString();
+  document.getElementById('kpi-end').textContent = end.toLocaleString();
+  const diffEl = document.getElementById('kpi-diff');
+  diffEl.textContent = (diff >= 0 ? '+' : '') + diff.toLocaleString();
+  diffEl.className = 'kpi-change ' + (diff > 0 ? 'up' : diff < 0 ? 'down' : 'neutral');
+  document.getElementById('kpi-changed').textContent = changed.length;
+  document.getElementById('kpi-updown').textContent = up + ' / ' + down;
+}
+
+function renderTotalTrend() {
+  chartTotal = echarts.init(document.getElementById('chart-total'));
+  const dates = rawData.dates;
+  const total = rawData.daily_total;
+  const changes = total.map((v, i) => i === 0 ? 0 : v - total[i-1]);
+
+  chartTotal.setOption({
+    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+    legend: { data: ['总卡数', '日变化量'], bottom: 0 },
+    grid: { left: 60, right: 60, top: 20, bottom: 40 },
+    xAxis: { type: 'category', data: dates, axisLabel: { rotate: 0 } },
+    yAxis: [
+      { type: 'value', name: '卡数', position: 'left' },
+      { type: 'value', name: '变化量', position: 'right' }
+    ],
+    series: [
+      { name: '总卡数', type: 'line', data: total, smooth: true, symbol: 'circle', symbolSize: 8,
+        itemStyle: { color: '#4a90d9' }, areaStyle: { color: { type: 'linear', x:0,y:0,x2:0,y2:1, colorStops:[{offset:0,color:'rgba(74,144,217,0.3)'},{offset:1,color:'rgba(74,144,217,0.05)'}] } } },
+      { name: '日变化量', type: 'bar', data: changes, yAxisIndex: 1,
+        itemStyle: { color: p => p.value >= 0 ? '#e74c3c' : '#27ae60' } }
+    ]
+  });
+}
+
+function renderCenterTrend() {
+  chartCenter = echarts.init(document.getElementById('chart-center'));
+  const series = rawData.centers.map((center, idx) => ({
+    name: center,
+    type: 'line',
+    stack: 'total',
+    areaStyle: {},
+    emphasis: { focus: 'series' },
+    data: rawData.center_daily[center],
+    smooth: true
+  }));
+
+  const colors = ['#4a90d9','#e74c3c','#27ae60','#f39c12','#9b59b6','#1abc9c','#e67e22','#34495e','#d35400'];
+
+  chartCenter.setOption({
+    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+    legend: { data: rawData.centers, bottom: 0, type: 'scroll' },
+    color: colors,
+    grid: { left: 60, right: 40, top: 20, bottom: 80 },
+    xAxis: { type: 'category', boundaryGap: false, data: rawData.dates },
+    yAxis: { type: 'value', name: '卡数' },
+    series: series
+  });
+}
+
+function renderRankChart() {
+  chartRank = echarts.init(document.getElementById('chart-rank'));
+  const items = Object.entries(rawData.partition_trends)
+    .map(([k, v]) => ({ name: k, ...v }))
+    .sort((a, b) => a.净变化 - b.净变化);
+
+  const names = items.map(i => i.name);
+  const values = items.map(i => i.净变化);
+
+  chartRank.setOption({
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' },
+      formatter: p => {
+        const d = p[0];
+        const item = items[d.dataIndex];
+        return `<b>${d.name}</b><br/>中心: ${item.中心}<br/>GPU: ${item.GPU类型}<br/>4.23: ${item.起始卡数} → 5.6: ${item.结束卡数}<br/>净变化: <b>${d.value > 0 ? '+' : ''}${d.value}</b>`;
+      }
+    },
+    grid: { left: 180, right: 60, top: 10, bottom: 20 },
+    xAxis: { type: 'value', name: '净变化（卡）' },
+    yAxis: { type: 'category', data: names, axisLabel: { fontSize: 11 } },
+    series: [{
+      type: 'bar',
+      data: values,
+      itemStyle: { color: p => p.value >= 0 ? '#e74c3c' : '#27ae60', borderRadius: [0, 4, 4, 0] },
+      label: { show: true, position: p => p.value >= 0 ? 'right' : 'left', formatter: p => (p.value > 0 ? '+' : '') + p.value, fontSize: 11 }
+    }]
+  });
+}
+
+let currentCenterFilter = '';
+let currentSearch = '';
+let currentGpuFilter = '';
+let showOnlyChanged = false;
+
+function renderFilters() {
+  const parts = Object.values(rawData.partition_trends);
+  const gpus = [...new Set(parts.map(p => p.GPU类型))];
+  const sel = document.getElementById('gpu-filter');
+  gpus.forEach(g => { const o = document.createElement('option'); o.value = g; o.textContent = g; sel.appendChild(o); });
+
+  const centers = [...new Set(parts.map(p => p.中心))];
+  const chipRow = document.getElementById('center-chips');
+  const allChip = document.createElement('div');
+  allChip.className = 'center-chip active';
+  allChip.textContent = '全部中心';
+  allChip.onclick = () => setCenterFilter('');
+  chipRow.appendChild(allChip);
+  centers.forEach(c => {
+    const chip = document.createElement('div');
+    chip.className = 'center-chip';
+    chip.textContent = c;
+    chip.onclick = () => setCenterFilter(c);
+    chipRow.appendChild(chip);
+  });
+
+  document.getElementById('search-input').addEventListener('input', e => { currentSearch = e.target.value; renderTable(); });
+  document.getElementById('gpu-filter').addEventListener('change', e => { currentGpuFilter = e.target.value; renderTable(); });
+  document.getElementById('only-change').addEventListener('change', e => { showOnlyChanged = e.target.checked; renderTable(); });
+}
+
+function setCenterFilter(c) {
+  currentCenterFilter = c;
+  document.querySelectorAll('.center-chip').forEach(el => el.classList.remove('active'));
+  event.target.classList.add('active');
+  renderTable();
+}
+
+function gpuClass(g) {
+  const map = { 'A100': 'tag-a100', 'A800': 'tag-a800', 'H200': 'tag-h200', '910B': 'tag-910b', '910C': 'tag-910c' };
+  return map[g] || 'tag-default';
+}
+
+function renderTable() {
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = '';
+
+  let items = Object.entries(rawData.partition_trends).map(([k, v]) => ({ name: k, ...v }));
+
+  if (showOnlyChanged) {
+    items = items.filter(i => i.净变化 !== 0);
+  }
+  if (currentCenterFilter) {
+    items = items.filter(i => i.中心 === currentCenterFilter);
+  }
+  if (currentGpuFilter) {
+    items = items.filter(i => i.GPU类型 === currentGpuFilter);
+  }
+  if (currentSearch) {
+    items = items.filter(i => i.name.toLowerCase().includes(currentSearch.toLowerCase()));
+  }
+
+  items.forEach(item => {
+    const tr = document.createElement('tr');
+    tr.style.cursor = 'pointer';
+    tr.onclick = () => showPopup(item.name);
+
+    const trendHtml = '<div class="date-cols">' + item.每日卡数.map((v, i) => {
+      const prev = i > 0 ? item.每日卡数[i-1] : v;
+      const changed = v !== prev;
+      return '<div class="date-cell" style="' + (changed ? 'font-weight:700;color:#e74c3c;' : '') + '">' + v + '</div>';
+    }).join('') + '</div>';
+
+    const changeClass = item.净变化 > 0 ? 'change-pos' : item.净变化 < 0 ? 'change-neg' : 'change-zero';
+    const changeText = (item.净变化 > 0 ? '+' : '') + item.净变化;
+
+    tr.innerHTML = `
+      <td><b>${item.name}</b></td>
+      <td>${item.中心}</td>
+      <td><span class="tag ${gpuClass(item.GPU类型)}">${item.GPU类型}</span></td>
+      <td>${item.所属集群}</td>
+      <td>${item.起始卡数}</td>
+      <td>${item.结束卡数}</td>
+      <td class="${changeClass}">${changeText}</td>
+      <td>${trendHtml}<div style="display:flex;gap:4px;margin-top:2px;">` + rawData.dates.map(d => '<div class="date-cell" style="color:#bbb;font-size:10px;">' + d + '</div>').join('') + `</div></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function showPopup(partitionName) {
+  const item = rawData.partition_trends[partitionName];
+  if (!item) return;
+  document.getElementById('popup-title').textContent = partitionName + ' 每日卡数趋势';
+  document.getElementById('overlay').classList.add('active');
+  document.getElementById('popup').classList.add('active');
+
+  if (chartPopup) chartPopup.dispose();
+  chartPopup = echarts.init(document.getElementById('chart-popup'));
+
+  const changes = item.每日卡数.map((v, i) => i === 0 ? 0 : v - item.每日卡数[i-1]);
+
+  chartPopup.setOption({
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['卡数', '日变化'], bottom: 0 },
+    grid: { left: 60, right: 60, top: 20, bottom: 40 },
+    xAxis: { type: 'category', data: rawData.dates },
+    yAxis: [
+      { type: 'value', name: '卡数', position: 'left' },
+      { type: 'value', name: '变化', position: 'right' }
+    ],
+    series: [
+      { name: '卡数', type: 'line', data: item.每日卡数, smooth: true, symbol: 'circle', symbolSize: 8, itemStyle: { color: '#4a90d9' }, areaStyle: { color: { type: 'linear', x:0,y:0,x2:0,y2:1, colorStops:[{offset:0,color:'rgba(74,144,217,0.3)'},{offset:1,color:'rgba(74,144,217,0.05)'}] } } },
+      { name: '日变化', type: 'bar', data: changes, yAxisIndex: 1, itemStyle: { color: p => p.value >= 0 ? '#e74c3c' : '#27ae60' } }
+    ]
+  });
+}
+
+function closePopup() {
+  document.getElementById('overlay').classList.remove('active');
+  document.getElementById('popup').classList.remove('active');
+}
+
+window.addEventListener('resize', () => {
+  chartTotal && chartTotal.resize();
+  chartCenter && chartCenter.resize();
+  chartRank && chartRank.resize();
+  chartPopup && chartPopup.resize();
+});
+
+// 嵌入数据占位符
+const EMBED_DATA = {
+  "dates": [
+    "4.23",
+    "4.24",
+    "4.25",
+    "4.26",
+    "4.27",
+    "4.28",
+    "4.29",
+    "4.30",
+    "5.1",
+    "5.2",
+    "5.3",
+    "5.4",
+    "5.5",
+    "5.6"
+  ],
+  "daily_total": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "center_daily": {
+    "AI for Science中心": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "前沿探索中心": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "大模型中心": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "安全可信AI中心": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "数据平台中心": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "物理智能中心": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "生态平台部": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "系统平台中心": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "评测专项组": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "centers": [
+    "AI for Science中心",
+    "前沿探索中心",
+    "大模型中心",
+    "安全可信AI中心",
+    "数据平台中心",
+    "物理智能中心",
+    "生态平台部",
+    "系统平台中心",
+    "评测专项组"
+  ],
+  "partition_trends": {
+    "vc-ams-deepseek": {
+      "中心": "数据平台中心",
+      "GPU类型": "910B",
+      "所属集群": "910-A2集群",
+      "起始卡数": 0,
+      "结束卡数": 224,
+      "净变化": 224,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ailab-safewt": {
+      "中心": "安全可信AI中心",
+      "GPU类型": "H200",
+      "所属集群": "H集群",
+      "起始卡数": 152,
+      "结束卡数": 192,
+      "净变化": 40,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ailab-evoagi": {
+      "中心": "安全可信AI中心",
+      "GPU类型": "H200",
+      "所属集群": "H集群",
+      "起始卡数": 88,
+      "结束卡数": 128,
+      "净变化": 40,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "vc-a2-discovery": {
+      "中心": "AI for Science中心",
+      "GPU类型": "910B",
+      "所属集群": "910-A2集群",
+      "起始卡数": 0,
+      "结束卡数": 24,
+      "净变化": 24,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ailab-puyullmgpu": {
+      "中心": "大模型中心",
+      "GPU类型": "H200",
+      "所属集群": "H集群",
+      "起始卡数": 832,
+      "结束卡数": 848,
+      "净变化": 16,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ailab-protfma": {
+      "中心": "AI for Science中心",
+      "GPU类型": "H200",
+      "所属集群": "H集群",
+      "起始卡数": 288,
+      "结束卡数": 304,
+      "净变化": 16,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ailab-mineru2": {
+      "中心": "数据平台中心",
+      "GPU类型": "H200",
+      "所属集群": "H集群",
+      "起始卡数": 96,
+      "结束卡数": 104,
+      "净变化": 8,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ailab-safer2ai": {
+      "中心": "安全可信AI中心",
+      "GPU类型": "H200",
+      "所属集群": "H集群",
+      "起始卡数": 96,
+      "结束卡数": 104,
+      "净变化": 8,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ailab-formalverification": {
+      "中心": "前沿探索中心",
+      "GPU类型": "H200",
+      "所属集群": "H集群",
+      "起始卡数": 0,
+      "结束卡数": 8,
+      "净变化": 8,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "agentdeployed": {
+      "中心": "AI for Science中心",
+      "GPU类型": "A800",
+      "所属集群": "火山云集群",
+      "起始卡数": 16,
+      "结束卡数": 8,
+      "净变化": -8,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "mineru_infra": {
+      "中心": "数据平台中心",
+      "GPU类型": "A100",
+      "所属集群": "P2集群",
+      "起始卡数": 8,
+      "结束卡数": 0,
+      "净变化": -8,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "medisco": {
+      "中心": "前沿探索中心",
+      "GPU类型": "A100",
+      "所属集群": "P1集群",
+      "起始卡数": 32,
+      "结束卡数": 24,
+      "净变化": -8,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "earth-e2e-p": {
+      "中心": "AI for Science中心",
+      "GPU类型": "A100",
+      "所属集群": "P1集群",
+      "起始卡数": 24,
+      "结束卡数": 16,
+      "净变化": -8,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ailab-sdpdev": {
+      "中心": "AI for Science中心",
+      "GPU类型": "H200",
+      "所属集群": "H集群",
+      "起始卡数": 24,
+      "结束卡数": 16,
+      "净变化": -8,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ailab-mineru3": {
+      "中心": "数据平台中心",
+      "GPU类型": "H200",
+      "所属集群": "H集群",
+      "起始卡数": 72,
+      "结束卡数": 64,
+      "净变化": -8,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "单机-司南在线评测用": {
+      "中心": "大模型中心",
+      "GPU类型": "A100",
+      "所属集群": "阿里云集群",
+      "起始卡数": 16,
+      "结束卡数": 8,
+      "净变化": -8,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ailab-ai4sdata2": {
+      "中心": "AI for Science中心",
+      "GPU类型": "H200",
+      "所属集群": "H集群",
+      "起始卡数": 24,
+      "结束卡数": 16,
+      "净变化": -8,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ailab-ecocommon": {
+      "中心": "生态平台部",
+      "GPU类型": "H200",
+      "所属集群": "H集群",
+      "起始卡数": 8,
+      "结束卡数": 0,
+      "净变化": -8,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ailab-protsci": {
+      "中心": "AI for Science中心",
+      "GPU类型": "H200",
+      "所属集群": "H集群",
+      "起始卡数": 16,
+      "结束卡数": 0,
+      "净变化": -16,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ailab-medeval": {
+      "中心": "生态平台部",
+      "GPU类型": "H200",
+      "所属集群": "H集群",
+      "起始卡数": 16,
+      "结束卡数": 0,
+      "净变化": -16,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ailab-safethm": {
+      "中心": "安全可信AI中心",
+      "GPU类型": "H200",
+      "所属集群": "H集群",
+      "起始卡数": 40,
+      "结束卡数": 24,
+      "净变化": -16,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ailab-ecospace": {
+      "中心": "生态平台部",
+      "GPU类型": "H200",
+      "所属集群": "H集群",
+      "起始卡数": 16,
+      "结束卡数": 0,
+      "净变化": -16,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ailab-solution": {
+      "中心": "生态平台部",
+      "GPU类型": "H200",
+      "所属集群": "H集群",
+      "起始卡数": 16,
+      "结束卡数": 0,
+      "净变化": -16,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ailab-vlminfer": {
+      "中心": "大模型中心",
+      "GPU类型": "H200",
+      "所属集群": "H集群",
+      "起始卡数": 112,
+      "结束卡数": 96,
+      "净变化": -16,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ailab-ai4neuro": {
+      "中心": "AI for Science中心",
+      "GPU类型": "H200",
+      "所属集群": "H集群",
+      "起始卡数": 64,
+      "结束卡数": 48,
+      "净变化": -16,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ai_moe": {
+      "中心": "前沿探索中心",
+      "GPU类型": "A100",
+      "所属集群": "P1集群",
+      "起始卡数": 48,
+      "结束卡数": 24,
+      "净变化": -24,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ailab-agent4review": {
+      "中心": "大模型中心",
+      "GPU类型": "H200",
+      "所属集群": "H集群",
+      "起始卡数": 576,
+      "结束卡数": 552,
+      "净变化": -24,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "mineru_infra_p1": {
+      "中心": "数据平台中心",
+      "GPU类型": "A100",
+      "所属集群": "P1集群",
+      "起始卡数": 24,
+      "结束卡数": 0,
+      "净变化": -24,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ailab-colab": {
+      "中心": "大模型中心",
+      "GPU类型": "H200",
+      "所属集群": "H集群",
+      "起始卡数": 48,
+      "结束卡数": 24,
+      "净变化": -24,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ailab-evalservice": {
+      "中心": "大模型中心",
+      "GPU类型": "H200",
+      "所属集群": "H集群",
+      "起始卡数": 64,
+      "结束卡数": 32,
+      "净变化": -32,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "mineru4s_p1": {
+      "中心": "数据平台中心",
+      "GPU类型": "A100",
+      "所属集群": "P1集群",
+      "起始卡数": 40,
+      "结束卡数": 0,
+      "净变化": -40,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ailab-safedefense": {
+      "中心": "安全可信AI中心",
+      "GPU类型": "H200",
+      "所属集群": "H集群",
+      "起始卡数": 40,
+      "结束卡数": 0,
+      "净变化": -40,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ailab-ipec": {
+      "中心": "前沿探索中心",
+      "GPU类型": "H200",
+      "所属集群": "H集群",
+      "起始卡数": 40,
+      "结束卡数": 0,
+      "净变化": -40,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "vlaflow": {
+      "中心": "物理智能中心",
+      "GPU类型": "A100",
+      "所属集群": "P2集群",
+      "起始卡数": 48,
+      "结束卡数": 0,
+      "净变化": -48,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "raise_sci": {
+      "中心": "数据平台中心",
+      "GPU类型": "A100",
+      "所属集群": "P1集群",
+      "起始卡数": 48,
+      "结束卡数": 0,
+      "净变化": -48,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "belt_road": {
+      "中心": "数据平台中心",
+      "GPU类型": "A100",
+      "所属集群": "P2集群",
+      "起始卡数": 56,
+      "结束卡数": 0,
+      "净变化": -56,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ailab-safearch": {
+      "中心": "安全可信AI中心",
+      "GPU类型": "H200",
+      "所属集群": "H集群",
+      "起始卡数": 136,
+      "结束卡数": 80,
+      "净变化": -56,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ailab-medisco": {
+      "中心": "前沿探索中心",
+      "GPU类型": "H200",
+      "所属集群": "H集群",
+      "起始卡数": 64,
+      "结束卡数": 0,
+      "净变化": -64,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ailab-steai": {
+      "中心": "安全可信AI中心",
+      "GPU类型": "H200",
+      "所属集群": "H集群",
+      "起始卡数": 160,
+      "结束卡数": 96,
+      "净变化": -64,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "data_gaoyuan": {
+      "中心": "数据平台中心",
+      "GPU类型": "A100",
+      "所属集群": "P2集群",
+      "起始卡数": 64,
+      "结束卡数": 0,
+      "净变化": -64,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "hod_t": {
+      "中心": "物理智能中心",
+      "GPU类型": "A800",
+      "所属集群": "T集群",
+      "起始卡数": 72,
+      "结束卡数": 0,
+      "净变化": -72,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "raise": {
+      "中心": "数据平台中心",
+      "GPU类型": "A100",
+      "所属集群": "P1集群",
+      "起始卡数": 80,
+      "结束卡数": 0,
+      "净变化": -80,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "evla_t": {
+      "中心": "物理智能中心",
+      "GPU类型": "A800",
+      "所属集群": "T集群",
+      "起始卡数": 96,
+      "结束卡数": 0,
+      "净变化": -96,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ebench_t": {
+      "中心": "物理智能中心",
+      "GPU类型": "A800",
+      "所属集群": "T集群",
+      "起始卡数": 112,
+      "结束卡数": 0,
+      "净变化": -112,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ailab-efm": {
+      "中心": "物理智能中心",
+      "GPU类型": "H200",
+      "所属集群": "H集群",
+      "起始卡数": 112,
+      "结束卡数": 0,
+      "净变化": -112,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "ftmanip": {
+      "中心": "物理智能中心",
+      "GPU类型": "A100",
+      "所属集群": "P2集群",
+      "起始卡数": 128,
+      "结束卡数": 0,
+      "净变化": -128,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "mineru2_p": {
+      "中心": "数据平台中心",
+      "GPU类型": "A100",
+      "所属集群": "P2集群",
+      "起始卡数": 128,
+      "结束卡数": 0,
+      "净变化": -128,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "dexmanip": {
+      "中心": "物理智能中心",
+      "GPU类型": "A100",
+      "所属集群": "P2集群",
+      "起始卡数": 128,
+      "结束卡数": 0,
+      "净变化": -128,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "eb3d_t": {
+      "中心": "物理智能中心",
+      "GPU类型": "A800",
+      "所属集群": "T集群",
+      "起始卡数": 160,
+      "结束卡数": 0,
+      "净变化": -160,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "vla_coop": {
+      "中心": "物理智能中心",
+      "GPU类型": "A800",
+      "所属集群": "T集群",
+      "起始卡数": 224,
+      "结束卡数": 0,
+      "净变化": -224,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "si": {
+      "中心": "物理智能中心",
+      "GPU类型": "A100",
+      "所属集群": "P2集群",
+      "起始卡数": 248,
+      "结束卡数": 0,
+      "净变化": -248,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "idc_t": {
+      "中心": "物理智能中心",
+      "GPU类型": "A800",
+      "所属集群": "T集群",
+      "起始卡数": 256,
+      "结束卡数": 0,
+      "净变化": -256,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "efm_data": {
+      "中心": "物理智能中心",
+      "GPU类型": "A800",
+      "所属集群": "T集群",
+      "起始卡数": 376,
+      "结束卡数": 0,
+      "净变化": -376,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "efm_t": {
+      "中心": "物理智能中心",
+      "GPU类型": "A800",
+      "所属集群": "T集群",
+      "起始卡数": 512,
+      "结束卡数": 0,
+      "净变化": -512,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "vc-a3-infer-ams": {
+      "中心": "数据平台中心",
+      "GPU类型": "910C",
+      "所属集群": "910-A3集群",
+      "起始卡数": 1712,
+      "结束卡数": 176,
+      "净变化": -1536,
+      "每日卡数": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  },
+  "change_rank": [
+    {
+      "分区名称": "vc-a3-infer-ams",
+      "中心": "数据平台中心",
+      "净变化": -1536
+    },
+    {
+      "分区名称": "efm_t",
+      "中心": "物理智能中心",
+      "净变化": -512
+    },
+    {
+      "分区名称": "efm_data",
+      "中心": "物理智能中心",
+      "净变化": -376
+    },
+    {
+      "分区名称": "idc_t",
+      "中心": "物理智能中心",
+      "净变化": -256
+    },
+    {
+      "分区名称": "si",
+      "中心": "物理智能中心",
+      "净变化": -248
+    },
+    {
+      "分区名称": "vla_coop",
+      "中心": "物理智能中心",
+      "净变化": -224
+    },
+    {
+      "分区名称": "eb3d_t",
+      "中心": "物理智能中心",
+      "净变化": -160
+    },
+    {
+      "分区名称": "dexmanip",
+      "中心": "物理智能中心",
+      "净变化": -128
+    },
+    {
+      "分区名称": "mineru2_p",
+      "中心": "数据平台中心",
+      "净变化": -128
+    },
+    {
+      "分区名称": "ftmanip",
+      "中心": "物理智能中心",
+      "净变化": -128
+    },
+    {
+      "分区名称": "ailab-efm",
+      "中心": "物理智能中心",
+      "净变化": -112
+    },
+    {
+      "分区名称": "ebench_t",
+      "中心": "物理智能中心",
+      "净变化": -112
+    },
+    {
+      "分区名称": "evla_t",
+      "中心": "物理智能中心",
+      "净变化": -96
+    },
+    {
+      "分区名称": "raise",
+      "中心": "数据平台中心",
+      "净变化": -80
+    },
+    {
+      "分区名称": "hod_t",
+      "中心": "物理智能中心",
+      "净变化": -72
+    },
+    {
+      "分区名称": "ailab-steai",
+      "中心": "安全可信AI中心",
+      "净变化": -64
+    },
+    {
+      "分区名称": "ailab-medisco",
+      "中心": "前沿探索中心",
+      "净变化": -64
+    },
+    {
+      "分区名称": "data_gaoyuan",
+      "中心": "数据平台中心",
+      "净变化": -64
+    },
+    {
+      "分区名称": "ailab-safearch",
+      "中心": "安全可信AI中心",
+      "净变化": -56
+    },
+    {
+      "分区名称": "belt_road",
+      "中心": "数据平台中心",
+      "净变化": -56
+    },
+    {
+      "分区名称": "raise_sci",
+      "中心": "数据平台中心",
+      "净变化": -48
+    },
+    {
+      "分区名称": "vlaflow",
+      "中心": "物理智能中心",
+      "净变化": -48
+    },
+    {
+      "分区名称": "ailab-ipec",
+      "中心": "前沿探索中心",
+      "净变化": -40
+    },
+    {
+      "分区名称": "ailab-safedefense",
+      "中心": "安全可信AI中心",
+      "净变化": -40
+    },
+    {
+      "分区名称": "mineru4s_p1",
+      "中心": "数据平台中心",
+      "净变化": -40
+    },
+    {
+      "分区名称": "ailab-evalservice",
+      "中心": "大模型中心",
+      "净变化": -32
+    },
+    {
+      "分区名称": "ailab-colab",
+      "中心": "大模型中心",
+      "净变化": -24
+    },
+    {
+      "分区名称": "mineru_infra_p1",
+      "中心": "数据平台中心",
+      "净变化": -24
+    },
+    {
+      "分区名称": "ai_moe",
+      "中心": "前沿探索中心",
+      "净变化": -24
+    },
+    {
+      "分区名称": "ailab-agent4review",
+      "中心": "大模型中心",
+      "净变化": -24
+    },
+    {
+      "分区名称": "ailab-ai4neuro",
+      "中心": "AI for Science中心",
+      "净变化": -16
+    },
+    {
+      "分区名称": "ailab-vlminfer",
+      "中心": "大模型中心",
+      "净变化": -16
+    },
+    {
+      "分区名称": "ailab-solution",
+      "中心": "生态平台部",
+      "净变化": -16
+    },
+    {
+      "分区名称": "ailab-ecospace",
+      "中心": "生态平台部",
+      "净变化": -16
+    },
+    {
+      "分区名称": "ailab-safethm",
+      "中心": "安全可信AI中心",
+      "净变化": -16
+    },
+    {
+      "分区名称": "ailab-medeval",
+      "中心": "生态平台部",
+      "净变化": -16
+    },
+    {
+      "分区名称": "ailab-protsci",
+      "中心": "AI for Science中心",
+      "净变化": -16
+    },
+    {
+      "分区名称": "agentdeployed",
+      "中心": "AI for Science中心",
+      "净变化": -8
+    },
+    {
+      "分区名称": "mineru_infra",
+      "中心": "数据平台中心",
+      "净变化": -8
+    },
+    {
+      "分区名称": "medisco",
+      "中心": "前沿探索中心",
+      "净变化": -8
+    },
+    {
+      "分区名称": "earth-e2e-p",
+      "中心": "AI for Science中心",
+      "净变化": -8
+    },
+    {
+      "分区名称": "ailab-mineru3",
+      "中心": "数据平台中心",
+      "净变化": -8
+    },
+    {
+      "分区名称": "单机-司南在线评测用",
+      "中心": "大模型中心",
+      "净变化": -8
+    },
+    {
+      "分区名称": "ailab-ai4sdata2",
+      "中心": "AI for Science中心",
+      "净变化": -8
+    },
+    {
+      "分区名称": "ailab-ecocommon",
+      "中心": "生态平台部",
+      "净变化": -8
+    },
+    {
+      "分区名称": "ailab-sdpdev",
+      "中心": "AI for Science中心",
+      "净变化": -8
+    },
+    {
+      "分区名称": "ailab-formalverification",
+      "中心": "前沿探索中心",
+      "净变化": 8
+    },
+    {
+      "分区名称": "ailab-safer2ai",
+      "中心": "安全可信AI中心",
+      "净变化": 8
+    },
+    {
+      "分区名称": "ailab-mineru2",
+      "中心": "数据平台中心",
+      "净变化": 8
+    },
+    {
+      "分区名称": "ailab-protfma",
+      "中心": "AI for Science中心",
+      "净变化": 16
+    },
+    {
+      "分区名称": "ailab-puyullmgpu",
+      "中心": "大模型中心",
+      "净变化": 16
+    },
+    {
+      "分区名称": "vc-a2-discovery",
+      "中心": "AI for Science中心",
+      "净变化": 24
+    },
+    {
+      "分区名称": "ailab-evoagi",
+      "中心": "安全可信AI中心",
+      "净变化": 40
+    },
+    {
+      "分区名称": "ailab-safewt",
+      "中心": "安全可信AI中心",
+      "净变化": 40
+    },
+    {
+      "分区名称": "vc-ams-deepseek",
+      "中心": "数据平台中心",
+      "净变化": 224
+    }
+  ]
+};
+loadData();
+</script>
+</body>
+</html>
